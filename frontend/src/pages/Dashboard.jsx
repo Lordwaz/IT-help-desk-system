@@ -4,7 +4,9 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend
 } from "recharts";
-import { Ticket, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { Ticket, CheckCircle2, AlertTriangle, Clock, Calendar as CalIcon, X } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 const COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4"];
 
@@ -22,12 +24,47 @@ function Kpi({ label, value, accent, icon: Icon }) {
   );
 }
 
+function DatePickerButton({ label, value, onChange, testid }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          data-testid={testid}
+          className="flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-md bg-white text-sm hover:bg-slate-50"
+        >
+          <CalIcon size={14} className="text-slate-500"/>
+          <span className={value ? "text-slate-900 tabular-nums" : "text-slate-500"}>
+            {value ? value.toLocaleDateString() : label}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar mode="single" selected={value} onSelect={onChange} initialFocus/>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [start, setStart] = useState(null);
+  const [end, setEnd] = useState(null);
 
-  useEffect(() => {
-    api.get("/dashboard/stats").then(r => setStats(r.data)).catch(()=>{});
-  }, []);
+  const load = async () => {
+    const params = {};
+    if (start) params.start = start.toISOString();
+    if (end) {
+      const e = new Date(end);
+      e.setHours(23, 59, 59, 999);
+      params.end = e.toISOString();
+    }
+    try {
+      const { data } = await api.get("/dashboard/stats", { params });
+      setStats(data);
+    } catch {}
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [start, end]);
 
   if (!stats) return <div className="text-sm text-slate-500">Loading…</div>;
 
@@ -37,10 +74,31 @@ export default function Dashboard() {
 
   return (
     <div data-testid="dashboard-page">
-      <div className="mb-6">
-        <div className="text-xs uppercase tracking-widest text-blue-600 font-bold mb-1 font-heading">// Overview</div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">Operations Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1">Real-time pulse across the queue.</p>
+      <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-blue-600 font-bold mb-1 font-heading">// Overview</div>
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">Operations Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Real-time pulse across the queue.</p>
+        </div>
+        <div className="flex items-end gap-2">
+          <div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">From</div>
+            <DatePickerButton testid="dashboard-start-date" label="Start date" value={start} onChange={setStart}/>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">To</div>
+            <DatePickerButton testid="dashboard-end-date" label="End date" value={end} onChange={setEnd}/>
+          </div>
+          {(start || end) && (
+            <button
+              data-testid="dashboard-clear-dates"
+              onClick={() => { setStart(null); setEnd(null); }}
+              className="flex items-center gap-1 px-3 py-2 text-xs text-slate-600 hover:text-slate-900 border border-slate-300 rounded-md hover:bg-slate-50"
+            >
+              <X size={12}/> Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">

@@ -839,6 +839,43 @@ async def dashboard_stats(
     }
 
 # ===========================
+# SLA WARNING SCHEDULER (background)
+# ===========================
+async def sla_warning_loop():
+    """Every 5 minutes, scan open tickets and notify when they enter the final 60-min window
+    of their resolution SLA. Each ticket is notified at most once via the sla_warning_notified flag."""
+    while True:
+        try:
+            now = now_utc()
+            cursor = db.tickets.find({
+                "status": {"$nin": ["Resolved", "Closed"]},
+                "sla_warning_notified": {"$ne": True}
+            })
+            async for t in cursor:
+                try:
+                    ca = datetime.fromisoformat(t["created_at"])
+                    rule = await get_sla_for(t["priority"])
+                    due = ca + timedelta(minutes=rule["resolution_minutes"])
+                    minutes_left = (due - now).total_seconds() / 60
+                    if 0 < minutes_left <= 60:
+                        target = t.get("assignee_id") or t.get("requester_id")
+                        if target:
+                            mins = int(minutes_left)
+                            await create_notification(
+                                target, str(t["_id"]), "sla_warning",
+                                f"SLA warning: {t['ticket_number']} due in {mins} min"
+                            )
+                        await db.tickets.update_one(
+                            {"_id": t["_id"]}, {"$set": {"sla_warning_notified": True}}
+                        )
+                        logger.info(f"SLA warning created for {t['ticket_number']}")
+                except Exception as e:
+                    logger.error(f"sla_warning_loop ticket {t.get('ticket_number')}: {e}")
+        except Exception as e:
+            logger.error(f"sla_warning_loop iteration error: {e}")
+        await asyncio.sleep(300)  # every 5 minutes
+
+# ===========================
 # Startup
 # ===========================
 @app.on_event("startup")
@@ -871,6 +908,9 @@ async def startup():
         )
     # Init storage
     init_storage()
+    # Launch SLA warning scheduler
+    asyncio.create_task(sla_warning_loop())
+    logger.info("SLA warning scheduler launched")
 
 @app.on_event("shutdown")
 async def shutdown():
