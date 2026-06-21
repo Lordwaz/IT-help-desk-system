@@ -29,7 +29,9 @@ export default function Layout({ children }) {
     try {
       const { data } = await api.get("/notifications");
       setNotifications(data);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load notifications", e);
+    }
   };
 
   useEffect(() => {

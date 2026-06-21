@@ -61,7 +61,9 @@ export default function Dashboard() {
     try {
       const { data } = await api.get("/dashboard/stats", { params });
       setStats(data);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load dashboard stats", e);
+    }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [start, end]);
@@ -140,7 +142,7 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie data={categoryData} dataKey="value" nameKey="name" outerRadius={80}>
-                {categoryData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
+                {categoryData.map((entry) => <Cell key={entry.name} fill={COLORS[categoryData.indexOf(entry) % COLORS.length]}/>)}
               </Pie>
               <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }}/>
               <Legend wrapperStyle={{ fontSize: 11 }}/>

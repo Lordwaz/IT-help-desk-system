@@ -165,8 +165,8 @@ export default function TicketDetail() {
             <TabsContent value="history" className="p-6 mt-0">
               <ol className="space-y-3">
                 {history.length === 0 && <li className="text-sm text-slate-500">No history yet.</li>}
-                {history.map((h, idx) => (
-                  <li key={idx} data-testid={`history-${idx}`} className="flex gap-3 text-sm">
+                {history.map((h) => (
+                  <li key={`${h.at}-${h.action}`} data-testid={`history-${h.at}`} className="flex gap-3 text-sm">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-2 flex-shrink-0"></div>
                     <div>
                       <span className="font-semibold text-slate-900">{h.actor?.name || "System"}</span>
