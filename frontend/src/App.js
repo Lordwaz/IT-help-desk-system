@@ -1,53 +1,60 @@
-import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Layout from "@/components/Layout";
+
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import Dashboard from "@/pages/Dashboard";
+import Tickets from "@/pages/Tickets";
+import TicketDetail from "@/pages/TicketDetail";
+import CreateTicket from "@/pages/CreateTicket";
+import KnowledgeBase from "@/pages/KnowledgeBase";
+import KbDetail from "@/pages/KbDetail";
+import KbEditor from "@/pages/KbEditor";
+import UsersPage from "@/pages/UsersPage";
+import SettingsPage from "@/pages/SettingsPage";
+
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
+function Protected({ children, roles }) {
   return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
+    <ProtectedRoute roles={roles}>
+      <Layout>{children}</Layout>
+    </ProtectedRoute>
   );
-};
+}
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+
+            <Route path="/" element={<Navigate to="/tickets" replace />} />
+            <Route path="/dashboard" element={<Protected roles={["admin","technician"]}><Dashboard /></Protected>} />
+            <Route path="/tickets" element={<Protected><Tickets /></Protected>} />
+            <Route path="/tickets/new" element={<Protected><CreateTicket /></Protected>} />
+            <Route path="/tickets/:id" element={<Protected><TicketDetail /></Protected>} />
+            <Route path="/kb" element={<Protected><KnowledgeBase /></Protected>} />
+            <Route path="/kb/new" element={<Protected roles={["admin","technician"]}><KbEditor /></Protected>} />
+            <Route path="/kb/:id" element={<Protected><KbDetail /></Protected>} />
+            <Route path="/kb/:id/edit" element={<Protected roles={["admin","technician"]}><KbEditor /></Protected>} />
+            <Route path="/users" element={<Protected roles={["admin"]}><UsersPage /></Protected>} />
+            <Route path="/settings" element={<Protected roles={["admin"]}><SettingsPage /></Protected>} />
+
+            <Route path="*" element={<Navigate to="/tickets" replace />} />
+          </Routes>
+          <Toaster richColors position="top-right" />
+        </AuthProvider>
       </BrowserRouter>
     </div>
   );

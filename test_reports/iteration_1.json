@@ -1,0 +1,54 @@
+{
+  "summary": "First-finish smoke test of IT Help Desk. Auth, users CRUD, ticket lifecycle (create, assign, status update, history), comments (with internal-note filtering for requesters), SLA defaults, KB CRUD+search+feedback, notifications, dashboard stats, password reset request, and frontend login + tickets queue + dashboard charts all working. One HIGH-priority backend bug: GET /api/tickets/export.csv returns 500 due to route ordering ({id} matches before export.csv).",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "POST /api/auth/login (admin seed) returns user + JWT token",
+    "GET /api/auth/me with Bearer token returns admin user",
+    "POST /api/users creates technician and requester (admin only)",
+    "POST /api/auth/login for newly-created requester succeeds",
+    "POST /api/tickets creates TCK-0001 with ticket_number, requester populated",
+    "PATCH /api/tickets/{id} updates assignee + status to Assigned, returns enriched assignee object",
+    "POST /api/tickets/{id}/comments with internal=true accepts; GET comments as requester returns [] (internal hidden) - filter works",
+    "Notification 'You have been assigned ticket TCK-0001' created for technician (GET /api/notifications)",
+    "GET /api/sla returns default rules for Critical/High/Medium/Low",
+    "POST /api/kb (with category) creates article; GET /api/kb?search returns it; POST /api/kb/{id}/feedback?helpful=true ok",
+    "GET /api/dashboard/stats returns total/open/resolved/by_status/by_priority/by_category/by_tech/timeline/avg_resolution_hours/sla_breach_count",
+    "POST /api/auth/forgot-password returns {ok:true} (Resend MOCKED to console)",
+    "Frontend login redirects to /tickets, sidebar renders (Dashboard/Tickets/KB/Users/Settings), TCK-0001 row visible with assignee Tech1",
+    "Dashboard renders Recharts SVGs (status bar, 14d timeline line, category pie, priority, tech workload)",
+    "JWT via Authorization Bearer header works end-to-end (token persisted in localStorage)"
+  ],
+  "failed": [
+    {
+      "area": "Backend route ordering",
+      "issue": "GET /api/tickets/export.csv returns HTTP 500. Backend log: 'bson.errors.InvalidId: \\'export.csv\\' is not a valid ObjectId'. The dynamic route GET /api/tickets/{id} is declared before/matching /api/tickets/export.csv, so 'export.csv' is parsed as the id parameter.",
+      "evidence": "curl -o /dev/null -w '%{http_code}' /api/tickets/export.csv -> 500; in-browser fetch from authenticated session also returns 500. Backend log shows InvalidId traceback. Frontend has an 'Export CSV' button on /tickets that will fail.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "KB create payload contract",
+      "issue": "POST /api/kb requires 'category' field but it is not optional/documented in problem statement examples. Not a bug per se but worth confirming UI sends it. (UI not exercised yet in this run for KB editor)",
+      "evidence": "POST {title,body,tags} -> 422 'Field required: category'. With category='Account Access' the request succeeds.",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Fix route ordering in /app/backend/server.py: move @app.get('/api/tickets/export.csv') ABOVE @app.get('/api/tickets/{id}') (or rename to /api/tickets/export so it doesn't collide). Then re-verify Export CSV downloads from the Tickets page.",
+    "Confirm KbEditor on the frontend always sends 'category' to /api/kb. Optional: make category default server-side."
+  ],
+  "success_rate": {"backend": "92%", "frontend": "100%"},
+  "retest_needed": true,
+  "full_testing_deferred": true,
+  "notes": {
+    "mocked_apis": ["Resend email (forgot-password) - placeholder API key, emails logged to console"],
+    "untested_in_this_run": [
+      "POST /api/auth/reset-password end-to-end (needs to fetch token from MongoDB)",
+      "POST /api/attachments multipart upload + GET /api/attachments/{id}/download",
+      "PUT /api/sla update by admin",
+      "POST /api/notifications/{id}/read and read-all",
+      "PATCH /api/users/{id} role/active updates",
+      "Frontend flows: CreateTicket form, KB editor, Users management, Settings/SLA update, notification badge interaction"
+    ],
+    "test_credentials_source": "/app/memory/test_credentials.md (present, admin@helpdesk.com / Admin123!)"
+  }
+}
