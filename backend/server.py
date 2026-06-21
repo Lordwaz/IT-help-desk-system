@@ -499,6 +499,24 @@ async def list_tickets(
         out.append(await serialize_ticket(t))
     return out
 
+# CSV Export (defined BEFORE /tickets/{tid} to avoid route collision)
+@api.get("/tickets/export.csv")
+async def export_tickets_csv(user=Depends(require_roles("admin"))):
+    cursor = db.tickets.find({}).sort("created_at", -1)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Ticket #", "Title", "Category", "Priority", "Status",
+                "Requester", "Assignee", "Created", "Resolved"])
+    async for t in cursor:
+        req = await db.users.find_one({"_id": ObjectId(t["requester_id"])}) if t.get("requester_id") else None
+        asg = await db.users.find_one({"_id": ObjectId(t["assignee_id"])}) if t.get("assignee_id") else None
+        w.writerow([t["ticket_number"], t["title"], t["category"], t["priority"], t["status"],
+                    (req or {}).get("name", ""), (asg or {}).get("name", ""),
+                    t.get("created_at", ""), t.get("resolved_at", "") or ""])
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": "attachment; filename=tickets.csv"})
+
 @api.get("/tickets/{tid}")
 async def get_ticket(tid: str, user=Depends(get_current_user)):
     t = await db.tickets.find_one({"_id": ObjectId(tid)})
@@ -615,24 +633,6 @@ async def ticket_history(tid: str, user=Depends(get_current_user)):
             "actor": {"id": str(actor["_id"]), "name": actor.get("name"), "role": actor.get("role")} if actor else None
         })
     return out
-
-# CSV Export
-@api.get("/tickets/export.csv")
-async def export_tickets_csv(user=Depends(require_roles("admin"))):
-    cursor = db.tickets.find({}).sort("created_at", -1)
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(["Ticket #", "Title", "Category", "Priority", "Status",
-                "Requester", "Assignee", "Created", "Resolved"])
-    async for t in cursor:
-        req = await db.users.find_one({"_id": ObjectId(t["requester_id"])}) if t.get("requester_id") else None
-        asg = await db.users.find_one({"_id": ObjectId(t["assignee_id"])}) if t.get("assignee_id") else None
-        w.writerow([t["ticket_number"], t["title"], t["category"], t["priority"], t["status"],
-                    (req or {}).get("name", ""), (asg or {}).get("name", ""),
-                    t.get("created_at", ""), t.get("resolved_at", "") or ""])
-    buf.seek(0)
-    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
-                             headers={"Content-Disposition": "attachment; filename=tickets.csv"})
 
 # ===========================
 # SLA RULES
